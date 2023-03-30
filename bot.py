@@ -3,6 +3,7 @@ import requests
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+from datetime import datetime
 
 
 load_dotenv()
@@ -67,7 +68,8 @@ async def forecast(ctx, *args):
         forecasts = []
         for forecast in data['list']:
             date_time = forecast['dt_txt']
-            date = date_time.split(' ')[0]
+            date = datetime.strptime(date_time.split(
+                ' ')[0], '%Y-%m-%d').strftime('%m-%d-%Y')
             time = date_time.split(' ')[1]
             temperature = round(forecast['main']['temp'], 1)
             weather_description = forecast['weather'][0]['description']
@@ -95,16 +97,19 @@ async def forecast(ctx, *args):
             low = forecast_data['low']
             forecasts = forecast_data['forecasts']
             embed = discord.Embed(title=f"Forecast for {date}", color=0x00f2)
-            for forecast in forecasts:
-                time = forecast['time']
-                temperature = forecast['temperature']
-                weather_description = forecast['weather_description']
-                icon_url = f"http://openweathermap.org/img/w/{forecast['icon']}.png"
-                embed.add_field(
-                    name=f"{time}", value=f"{temperature}°F {weather_description}", inline=True)
-                embed.set_thumbnail(url=icon_url)
+            # for forecast in forecasts:
+            #     time = forecast['time']
+            #     temperature = forecast['temperature']
+            #     weather_description = forecast['weather_description']
+            #     icon_url = f"http://openweathermap.org/img/w/{forecast['icon']}.png"
+            #     embed.add_field(
+            #         name=f"{time}", value=f"{temperature}°F {weather_description}", inline=True)
+            #     embed.set_thumbnail(url=icon_url)
+            weather_description = forecast['weather_description']
+            icon_url = f"http://openweathermap.org/img/w/{forecast['icon']}.png"
             embed.add_field(name="High", value=f"{high}°F", inline=True)
             embed.add_field(name="Low", value=f"{low}°F", inline=True)
+            embed.set_thumbnail(url=icon_url)
             await ctx.send(embed=embed)
     else:
         message = "Unable to retrieve weather forecast data for the specified location."
