@@ -33,17 +33,28 @@ async def weather(ctx, *args):
         data = response.json()
         # Extract the relevant weather data
         temperature = data['main']['temp']
+        high = data['main']['temp_max']
+        low = data['main']['temp_min']
         description = data['weather'][0]['description']
         humidity = data['main']['humidity']
         wind_speed = data['wind']['speed']
+        icon = data['weather'][0]['icon']
+        icon_url = f"http://openweathermap.org/img/w/{icon}.png"
         # Create an embed to display the weather data
         embed = discord.Embed(
-            title=f"Current weather in {location}", color=0x00f2)
-        embed.add_field(name="Temperature",
-                        value=f"{temperature} degrees Fahrenheit", inline=False)
-        embed.add_field(name="Description", value=description, inline=False)
-        embed.add_field(name="Humidity", value=f"{humidity}%", inline=False)
-        embed.add_field(name="Wind Speed",
+            title=f"Current weather in {location.title()}", color=0x9370D0)
+        embed.set_thumbnail(url=icon_url)
+        embed.add_field(name="**Temperature**",
+                        value=f"{temperature}°F", inline=False)
+        embed.add_field(
+            name="**High**", value=f"{high}°F", inline=True)
+        embed.add_field(
+            name="**Low**", value=f"{low}°F", inline=True)
+        embed.add_field(name="**Description**",
+                        value=description.title(), inline=False)
+        embed.add_field(name="**Humidity**",
+                        value=f"{humidity}%", inline=False)
+        embed.add_field(name="**Wind Speed**",
                         value=f"{wind_speed} m/s", inline=False)
         # Send the embed back to the user
         await ctx.send(embed=embed)
@@ -93,14 +104,14 @@ async def forecast(ctx, *args):
 
         # Create an embed for all 5 days' forecasts
         embed = discord.Embed(
-            title=f"Weekly forecast for {location.title()}", color=0x00f2)
+            title=f"Weekly forecast for {location.title()}", color=0x9370D0)
         for date, forecast_data in daily_forecasts.items():
             high = forecast_data['high']
             low = forecast_data['low']
             weather_description = forecast_data['forecasts'][0]['weather_description']
             icon_url = f"http://openweathermap.org/img/w/{forecast_data['forecasts'][0]['icon']}.png"
             embed.add_field(
-                name=date, value=f"**High:** {high}°F\n**Low:** {low}°F\n**Weather:** {weather_description}", inline=True)
+                name=date, value=f"**High:** {high}°F\n**Low:** {low}°F\n**Weather:** {weather_description.title()}", inline=True)
             embed.set_thumbnail(url=icon_url)
 
         # Send the embed back to the user
