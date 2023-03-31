@@ -69,7 +69,7 @@ async def forecast(ctx, *args):
         for forecast in data['list']:
             date_time = forecast['dt_txt']
             date = datetime.strptime(date_time.split(
-                ' ')[0], '%Y-%m-%d').strftime('%m-%d-%Y')
+                ' ')[0], '%Y-%m-%d').strftime('%b %d, %Y')
             time = date_time.split(' ')[1]
             temperature = round(forecast['main']['temp'], 1)
             weather_description = forecast['weather'][0]['description']
@@ -93,14 +93,14 @@ async def forecast(ctx, *args):
 
         # Create an embed for all 5 days' forecasts
         embed = discord.Embed(
-            title=f"Weekly forecast for {location}", color=0x00f2)
+            title=f"Weekly forecast for {location.title()}", color=0x00f2)
         for date, forecast_data in daily_forecasts.items():
             high = forecast_data['high']
             low = forecast_data['low']
             weather_description = forecast_data['forecasts'][0]['weather_description']
             icon_url = f"http://openweathermap.org/img/w/{forecast_data['forecasts'][0]['icon']}.png"
             embed.add_field(
-                name=date, value=f"**High:** {high}°F\n**Low:** {low}°F\n**Weather:** {weather_description}", inline=False)
+                name=date, value=f"**High:** {high}°F\n**Low:** {low}°F\n**Weather:** {weather_description}", inline=True)
             embed.set_thumbnail(url=icon_url)
 
         # Send the embed back to the user
