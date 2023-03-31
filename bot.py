@@ -1,9 +1,10 @@
 import os
+import json
 import requests
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 load_dotenv()
@@ -16,6 +17,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 @bot.event
 async def on_ready():
+    print(f'DISCORD: {TOKEN}\nWEATHER: {WEATHER_API_KEY}')
     print("Hello, I'm ready to tell you the weather!")
 
 
@@ -75,12 +77,17 @@ async def forecast(ctx, *args):
     if response.status_code == 200:
         # Parse the JSON response
         data = response.json()
+        api_data_filepath = os.path.join(os.path.dirname(__file__), 'forecast.json')
+        with open(api_data_filepath, 'w') as fp:
+            json.dump(data, fp, indent=4)
         # Extract the relevant forecast data
         forecasts = []
         for forecast in data['list']:
             date_time = forecast['dt_txt']
-            date = datetime.strptime(date_time.split(
-                ' ')[0], '%Y-%m-%d').strftime('%b %d, %Y')
+            date = datetime.strptime(date_time.split(' ')[0], '%Y-%m-%d')
+            if date > datetime.now() + timedelta(days=4):
+                break
+            date = date.strftime('%b %d, %Y')
             time = date_time.split(' ')[1]
             temperature = round(forecast['main']['temp'], 1)
             weather_description = forecast['weather'][0]['description']
@@ -115,7 +122,8 @@ async def forecast(ctx, *args):
             embed.set_thumbnail(url=icon_url)
 
         # Send the embed back to the user
-        await ctx.send(embed=embed)
+        debug_file = discord.File(api_data_filepath, 'forecast.json')
+        await ctx.send(embed=embed, file=debug_file)
     else:
         message = "Unable to retrieve weather forecast data for the specified location."
         await ctx.send(message)
