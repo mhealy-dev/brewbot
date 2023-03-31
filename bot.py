@@ -168,30 +168,39 @@ async def send_forecasts(ctx, forecasts):
         def __init__(self):
             super().__init__()
             self.index = 0
+            self.pages = pages
             self.message = None
+            # Determine whether the "Next" button should be disabled initially
+            self.disabled = len(self.pages) <= 1
 
         async def edit_message(self):
             # Edit the message with the current page's content
             if self.message:
                 await self.message.edit(embed=pages[self.index][0])
 
-        @discord.ui.button(label='Previous', style=discord.ButtonStyle.primary)
-        async def prev_page(self, button: discord.ui.Button, interaction: discord.Interaction):
+        @discord.ui.button(label='Previous', style=discord.ButtonStyle.blurple)
+        async def prev_page(self, interaction: discord.Interaction, button: discord.ui.button):
             # Go to the previous page, if possible
             if self.index > 0:
                 self.index -= 1
+                self.disabled = False  # Re-enable the "Next" button
                 await self.edit_message()
+            await interaction.response.defer()
 
-        @discord.ui.button(label='Next', style=discord.ButtonStyle.primary)
-        async def next_page(self, button: discord.ui.Button, interaction: discord.Interaction):
+        @discord.ui.button(label='Next', style=discord.ButtonStyle.blurple)
+        async def next_page(self, interaction: discord.Interaction, button: discord.ui.button):
             # Go to the next page, if possible
-            if self.index < len(pages) - 1:
+            if self.index < len(self.pages) - 1:
                 self.index += 1
                 await self.edit_message()
+            else:
+                button.disabled = True
+            await interaction.response.defer()
 
         @discord.ui.button(label='Stop', style=discord.ButtonStyle.danger)
-        async def stop_pagination(self, button: discord.ui.Button, interaction: discord.Interaction):
+        async def stop_pagination(self, interaction: discord.Interaction, button: discord.ui.button):
             # Stop the pagination
+            await interaction.response.defer()
             self.stop()
 
     # Send the first page of the message with the paginator
