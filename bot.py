@@ -99,82 +99,49 @@ async def forecast(ctx, *args):
             temperature = round(forecast['main']['temp'], 1)
             weather_description = forecast['weather'][0]['description']
             icon = forecast['weather'][0]['icon']
-            forecasts.append({'date': date, 'time': time, 'temperature': temperature,
-                             'weather_description': weather_description, 'icon': icon})
+            # Check if this forecast is for a new day
+            if len(forecasts) == 0 or date != forecasts[-1]['date']:
+                daily_forecast = {
+                    'date': date,
+                    'high': temperature,
+                    'low': temperature,
+                    'weather_description': weather_description,
+                    'icon': icon
+                }
+                forecasts.append(daily_forecast)
+            else:
+                daily_forecast = forecasts[-1]
+                if temperature > daily_forecast['high']:
+                    daily_forecast['high'] = temperature
+                if temperature < daily_forecast['low']:
+                    daily_forecast['low'] = temperature
         if not forecasts:
             await ctx.send(f"Unable to retrieve weather forecast data for this {location.title()} the next 5 days.")
             return
-        # Group the forecasts by date and calculate the daily high and low temperatures
-        daily_forecasts = []
-        dates_in_forecast = []
-        for forecast in forecasts:
-            new_day = {}
-            date = forecast.get('date', None)
-            previous_index = None
-            if date not in daily_forecasts:
-                new_day = {
-                    'high': None, 'low': None, 'forecasts': []}
-            else:
-                for i, x in enumerate(daily_forecasts):
-                    if x['date'] == date:
-                        new_day = x
-                        previous_index = i
-                        break
-            temperature = forecast['temperature']
-            if new_day['high'] is None or temperature > new_day['high']:
-                new_day['high'] = temperature
-            if new_day['low'] is None or temperature < new_day['low']:
-                new_day['low'] = temperature
-            new_day['date'] = date
-            new_day['forecasts'].append(forecast)
-            if not previous_index:
-                daily_forecasts.append(new_day)
-                dates_in_forecast.append(date)
-            else:
-                daily_forecasts[previous_index] = new_day
-
-        # Create an embed for all 5 days' forecasts
-        # embed = discord.Embed(
-        #     title=f"5 day forecast for {location.title()}", color=0x9370D0)
-        # for date, forecast_data in daily_forecasts.items():
-        #     high = forecast_data['high']
-        #     low = forecast_data['low']
-        #     weather_description = forecast_data['forecasts'][0]['weather_description']
-        #     icon_url = f"http://openweathermap.org/img/w/{forecast_data['forecasts'][0]['icon']}.png"
-        #     embed.add_field(
-        #         name=date, value=f"**High:** {high}°F\n**Low:** {low}°F\n**Weather:** {weather_description.title()}", inline=True)
-        #     embed.set_thumbnail(url=icon_url)
-
-        # Create the embeds for each day's forecasts
+        # Create an embed for each day's forecast
         embeds = []
-        for forecast_data in daily_forecasts:
+        for forecast_data in forecasts:
             high = forecast_data['high']
             low = forecast_data['low']
-            weather_description = forecast_data['forecasts'][0]['weather_description']
-            icon_url = f"http://openweathermap.org/img/w/{forecast_data['forecasts'][0]['icon']}.png"
-
+            weather_description = forecast_data['weather_description']
+            icon_url = f"http://openweathermap.org/img/w/{forecast_data['icon']}.png"
             # Create an embed for the day's forecast
             embed = discord.Embed(
                 title=f"Forecast for {location.title()} on {forecast_data['date']}", color=0x9370D0)
             embed.add_field(
-                name="High Temperature", value=f"{high}°F", inline=True)
+                name="**High**", value=f"{high}°F", inline=True)
             embed.add_field(
-                name="Low Temperature", value=f"{low}°F", inline=True)
+                name="**Low**", value=f"{low}°F", inline=True)
             embed.add_field(
-                name="Weather Description", value=weather_description.title(), inline=False)
+                name="**Description**", value=weather_description.title(), inline=False)
             embed.set_thumbnail(url=icon_url)
-
             # Add the embed to the list of embeds
             embeds.append(embed)
-
-        # Include API data in JSON file if env.DEBUG_MODE == 'True'
-        debug_file = debug_api_data(data)
-
-        # Send the embed back to the user
+        # Send the embed(s) back to the user
         if len(embeds) > 1:
-            await send_forecasts(ctx, daily_forecasts)
+            await send_forecasts(ctx, embeds)
         else:
-            await ctx.send(embed=embed, file=debug_file)
+            await ctx.send(embed=embeds[0])
     else:
         message = "Unable to retrieve weather forecast data for the specified location."
         await ctx.send(message)
@@ -183,17 +150,16 @@ async def forecast(ctx, *args):
 async def send_forecasts(ctx, forecasts):
     pages = []
     page = []
-    for forecast in forecasts:
-        # Create a string representation of the forecast
-        forecast_str = f"**High:** {forecast['high']}°F\n**Low:** {forecast['low']}°F\n**Weather:** {forecast.get('weather_description', '')}"
-        page.append(f"**{forecast['date']}**\n{forecast_str}")
+    for embed in forecasts:
+        # Add the embed to the page
+        page.append(embed)
 
-        # If we've accumulated 10 lines, start a new page
-        if len(page) == 10:
+        # If we've accumulated 1 embed, start a new page
+        if len(page) == 1:
             pages.append(page)
             page = []
 
-    # If we have any leftover lines, add them to the last page
+    # If we have any leftover embeds, add them to the last page
     if page:
         pages.append(page)
 
@@ -207,7 +173,7 @@ async def send_forecasts(ctx, forecasts):
         async def edit_message(self):
             # Edit the message with the current page's content
             if self.message:
-                await self.message.edit(content='\n'.join(pages[self.index]))
+                await self.message.edit(embed=pages[self.index][0])
 
         @discord.ui.button(label='Previous', style=discord.ButtonStyle.primary)
         async def prev_page(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -231,7 +197,7 @@ async def send_forecasts(ctx, forecasts):
     # Send the first page of the message with the paginator
     view = ForecastPaginator()
     await view.edit_message()
-    view.message = await ctx.send('\n'.join(pages[0]), view=view)
+    view.message = await ctx.send(embed=pages[0][0], view=view)
 
     # Wait for the paginator to stop
     await view.wait()
