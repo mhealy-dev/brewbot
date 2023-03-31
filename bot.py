@@ -91,28 +91,21 @@ async def forecast(ctx, *args):
                 daily_forecasts[date]['low'] = temperature
             daily_forecasts[date]['forecasts'].append(forecast)
 
-        # Create an embed for each day's forecast
+        # Create an embed for all 5 days' forecasts
+        embed = discord.Embed(
+            title=f"Weekly forecast for {location}", color=0x00f2)
         for date, forecast_data in daily_forecasts.items():
             high = forecast_data['high']
             low = forecast_data['low']
-            forecasts = forecast_data['forecasts']
-            embed = discord.Embed(title=f"Forecast for {date}", color=0x00f2)
-            # for forecast in forecasts:
-            #     time = forecast['time']
-            #     temperature = forecast['temperature']
-            #     weather_description = forecast['weather_description']
-            #     icon_url = f"http://openweathermap.org/img/w/{forecast['icon']}.png"
-            #     embed.add_field(
-            #         name=f"{time}", value=f"{temperature}°F {weather_description}", inline=True)
-            #     embed.set_thumbnail(url=icon_url)
-            weather_description = forecast['weather_description']
-            icon_url = f"http://openweathermap.org/img/w/{forecast['icon']}.png"
-            embed.add_field(name="High", value=f"{high}°F", inline=True)
-            embed.add_field(name="Low", value=f"{low}°F", inline=True)
+            weather_description = forecast_data['forecasts'][0]['weather_description']
+            icon_url = f"http://openweathermap.org/img/w/{forecast_data['forecasts'][0]['icon']}.png"
+            embed.add_field(
+                name=date, value=f"**High:** {high}°F\n**Low:** {low}°F\n**Weather:** {weather_description}", inline=False)
             embed.set_thumbnail(url=icon_url)
-            await ctx.send(embed=embed)
+
+        # Send the embed back to the user
+        await ctx.send(embed=embed)
     else:
         message = "Unable to retrieve weather forecast data for the specified location."
         await ctx.send(message)
-
 bot.run(TOKEN)
