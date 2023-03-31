@@ -1,18 +1,27 @@
 import os
+import json
 import requests
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 WEATHER_API_KEY = os.getenv('WEATHER_API_KEY')
+DEBUG_MODE = os.getenv('DEBUG_MODE', 'False')
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+def debug_api_data(data):
+    if DEBUG_MODE != 'True':
+        return None
+    api_data_filepath = os.path.join(os.path.dirname(__file__), 'sample-data', 'forecast.json')
+    with open(api_data_filepath, 'w') as fp:
+        json.dump(data, fp, indent=4)
+    return discord.File(api_data_filepath, 'forecast.json')
 
 @bot.event
 async def on_ready():
@@ -79,8 +88,10 @@ async def forecast(ctx, *args):
         forecasts = []
         for forecast in data['list']:
             date_time = forecast['dt_txt']
-            date = datetime.strptime(date_time.split(
-                ' ')[0], '%Y-%m-%d').strftime('%b %d, %Y')
+            date = datetime.strptime(date_time.split(' ')[0], '%Y-%m-%d')
+            if date > datetime.now() + timedelta(days=4):
+                break
+            date = date.strftime('%b %d, %Y')
             time = date_time.split(' ')[1]
             temperature = round(forecast['main']['temp'], 1)
             weather_description = forecast['weather'][0]['description']
@@ -113,9 +124,11 @@ async def forecast(ctx, *args):
             embed.add_field(
                 name=date, value=f"**High:** {high}°F\n**Low:** {low}°F\n**Weather:** {weather_description.title()}", inline=True)
             embed.set_thumbnail(url=icon_url)
-
+     
+        # Include API data in JSON file if env.DEBUG_MODE == 'True'
+        debug_file = debug_api_data(data)
         # Send the embed back to the user
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed, file=debug_file)
     else:
         message = "Unable to retrieve weather forecast data for the specified location."
         await ctx.send(message)
