@@ -178,70 +178,42 @@ async def send_forecasts(ctx, forecasts):
             self.index = 0
             self.pages = pages
             self.message = None
-            self.next_button = discord.ui.Button(
-                label='Next', custom_id='next', style=discord.ButtonStyle.primary)
-            self.next_button.callback = self.next_page
             self.prev_button = discord.ui.Button(
                 label='Previous', custom_id='prev', style=discord.ButtonStyle.primary)
             self.prev_button.callback = self.prev_page
+            self.next_button = discord.ui.Button(
+                label='Next', custom_id='next', style=discord.ButtonStyle.primary)
+            self.next_button.callback = self.next_page
             self.add_item(self.prev_button)
             self.add_item(self.next_button)
+            
 
-        async def change_button(self, button_id, disable_or_enable):
-            for item in self.children:
-                if item.custom_id == button_id:
-                    item.disabled = disable_or_enable
-                    break
-
-        async def edit_message(self):
-            # Edit the message with the current page's content
-
-            print(self.index)
-            # await self.change_button('prev', self.index == 0)
-            # await self.change_button('next', self.index == len(self.pages) - 1)
-
-            if self.message:
-                await self.message.edit(embed=pages[self.index][0])
+        def check_buttons(self):
+            self.prev_button.disabled = self.index == 0
+            self.next_button.disabled = self.index == len(self.pages) - 1
 
         async def prev_page(self, interaction: discord.Interaction):
             if self.index > 0:
                 self.index -= 1
-            self.prev_button.disabled = self.index == 0
+            self.check_buttons()
             await interaction.response.edit_message(view=self, embed=pages[self.index][0])
 
         async def next_page(self, interaction: discord.Interaction):
             # Go to the next page, if possible
             if self.index < len(self.pages) - 1:
                 self.index += 1
-            self.next_button.disabled = self.index == len(self.pages) - 1
+            self.check_buttons()
             await interaction.response.edit_message(view=self, embed=pages[self.index][0])
-
-        # @ discord.ui.button()
-        # async def prev_page(self, interaction: discord.Interaction, button: discord.ui.button):
-        #     # Go to the previous page, if possible
-        #     if self.index > 0:
-        #         self.index -= 1
-        #     button.disabled = self.index == 0
-        #         await self.edit_message(view=self)
-        #     await interaction.response.defer()
-
-        # @ discord.ui.button()
-        # async def next_page(self, interaction: discord.Interaction, button: discord.ui.button):
-        #     # Go to the next page, if possible
-        #     if self.index < len(self.pages) - 1:
-        #         self.index += 1
-        #         await self.edit_message()
-        #     await interaction.response.defer()
 
         @ discord.ui.button(label='Stop', style=discord.ButtonStyle.danger)
         async def stop_pagination(self, interaction: discord.Interaction, button: discord.ui.button):
             # Stop the pagination
-            await interaction.response.defer()
+            await interaction.response.edit_message(view=None)
             self.stop()
 
     # Send the first page of the message with the paginator
     view = ForecastPaginator()
-    await view.edit_message()
+    view.check_buttons()
     view.message = await ctx.send(embed=pages[0][0], view=view)
 
     # Wait for the paginator to stop
