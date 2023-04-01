@@ -156,20 +156,7 @@ async def forecast(ctx, *args):
 
 
 async def send_forecasts(ctx, forecasts):
-    pages = []
-    page = []
-    for embed in forecasts:
-        # Add the embed to the page
-        page.append(embed)
-
-        # If we've accumulated 1 embed, start a new page
-        if len(page) == 1:
-            pages.append(page)
-            page = []
-
-    # If we have any leftover embeds, add them to the last page
-    if page:
-        pages.append(page)
+    pages = [embed for embed in forecasts]
 
     # Define the message components
     class ForecastPaginator(discord.ui.View):
@@ -196,14 +183,14 @@ async def send_forecasts(ctx, forecasts):
             if self.index > 0:
                 self.index -= 1
             self.check_buttons()
-            await interaction.response.edit_message(view=self, embed=pages[self.index][0])
+            await interaction.response.edit_message(view=self, embed=pages[self.index])
 
         async def next_page(self, interaction: discord.Interaction):
             # Go to the next page, if possible
             if self.index < len(self.pages) - 1:
                 self.index += 1
             self.check_buttons()
-            await interaction.response.edit_message(view=self, embed=pages[self.index][0])
+            await interaction.response.edit_message(view=self, embed=pages[self.index])
 
         @ discord.ui.button(label='Stop', style=discord.ButtonStyle.danger)
         async def stop_pagination(self, interaction: discord.Interaction, button: discord.ui.button):
@@ -214,7 +201,7 @@ async def send_forecasts(ctx, forecasts):
     # Send the first page of the message with the paginator
     view = ForecastPaginator()
     view.check_buttons()
-    view.message = await ctx.send(embed=pages[0][0], view=view)
+    view.message = await ctx.send(embed=pages[0], view=view)
 
     # Wait for the paginator to stop
     await view.wait()
