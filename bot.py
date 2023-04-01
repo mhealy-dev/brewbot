@@ -15,13 +15,16 @@ DEBUG_MODE = os.getenv('DEBUG_MODE', 'False')
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+
 def debug_api_data(data):
     if DEBUG_MODE != 'True':
         return None
-    api_data_filepath = os.path.join(os.path.dirname(__file__), 'sample-data', 'forecast.json')
+    api_data_filepath = os.path.join(os.path.dirname(
+        __file__), 'sample-data', 'forecast.json')
     with open(api_data_filepath, 'w') as fp:
         json.dump(data, fp, indent=4)
     return discord.File(api_data_filepath, 'forecast.json')
+
 
 @bot.event
 async def on_ready():
@@ -89,47 +92,124 @@ async def forecast(ctx, *args):
         for forecast in data['list']:
             date_time = forecast['dt_txt']
             date = datetime.strptime(date_time.split(' ')[0], '%Y-%m-%d')
-            if date > datetime.now() + timedelta(days=4):
-                break
+            if date.day == datetime.now().day:
+                continue
             date = date.strftime('%b %d, %Y')
             time = date_time.split(' ')[1]
             temperature = round(forecast['main']['temp'], 1)
             weather_description = forecast['weather'][0]['description']
             icon = forecast['weather'][0]['icon']
-            forecasts.append({'date': date, 'time': time, 'temperature': temperature,
-                             'weather_description': weather_description, 'icon': icon})
-
-        # Group the forecasts by date and calculate the daily high and low temperatures
-        daily_forecasts = {}
-        for forecast in forecasts:
-            date = forecast['date']
-            if date not in daily_forecasts:
-                daily_forecasts[date] = {
-                    'high': None, 'low': None, 'forecasts': []}
-            temperature = forecast['temperature']
-            if daily_forecasts[date]['high'] is None or temperature > daily_forecasts[date]['high']:
-                daily_forecasts[date]['high'] = temperature
-            if daily_forecasts[date]['low'] is None or temperature < daily_forecasts[date]['low']:
-                daily_forecasts[date]['low'] = temperature
-            daily_forecasts[date]['forecasts'].append(forecast)
-
-        # Create an embed for all 5 days' forecasts
-        embed = discord.Embed(
-            title=f"Weekly forecast for {location.title()}", color=0x9370D0)
-        for date, forecast_data in daily_forecasts.items():
+            # Check if this forecast is for a new day
+            if len(forecasts) == 0 or date != forecasts[-1]['date']:
+                daily_forecast = {
+                    'date': date,
+                    'high': temperature,
+                    'low': temperature,
+                    'weather_description': weather_description,
+                    'icon': icon
+                }
+                forecasts.append(daily_forecast)
+            else:
+                daily_forecast = forecasts[-1]
+                if temperature > daily_forecast['high']:
+                    daily_forecast['high'] = temperature
+                if temperature < daily_forecast['low']:
+                    daily_forecast['low'] = temperature
+        if not forecasts:
+            await ctx.send(f"Unable to retrieve weather forecast data for this {location.title()} the next 5 days.")
+            return
+        # Create an embed for each day's forecast
+        embeds = []
+        for forecast_data in forecasts:
             high = forecast_data['high']
             low = forecast_data['low']
-            weather_description = forecast_data['forecasts'][0]['weather_description']
-            icon_url = f"http://openweathermap.org/img/w/{forecast_data['forecasts'][0]['icon']}.png"
+            weather_description = forecast_data['weather_description']
+            icon_url = f"http://openweathermap.org/img/w/{forecast_data['icon']}.png"
+            # Create an embed for the day's forecast
+            embed = discord.Embed(
+                title=f"Forecast for {location.title()} on {forecast_data['date']}", color=0x9370D0)
             embed.add_field(
-                name=date, value=f"**High:** {high}°F\n**Low:** {low}°F\n**Weather:** {weather_description.title()}", inline=True)
+                name="**High**", value=f"{high}°F", inline=True)
+            embed.add_field(
+                name="**Low**", value=f"{low}°F", inline=True)
+            embed.add_field(
+                name="**Description**", value=weather_description.title(), inline=False)
             embed.set_thumbnail(url=icon_url)
-     
-        # Include API data in JSON file if env.DEBUG_MODE == 'True'
-        debug_file = debug_api_data(data)
-        # Send the embed back to the user
-        await ctx.send(embed=embed, file=debug_file)
+            # Add the embed to the list of embeds
+            embeds.append(embed)
+        # Send the embed(s) back to the user
+        if len(embeds) > 1:
+            await send_forecasts(ctx, embeds)
+        else:
+            await ctx.send(embed=embeds[0])
     else:
         message = "Unable to retrieve weather forecast data for the specified location."
         await ctx.send(message)
+
+
+async def send_forecasts(ctx, forecasts):
+    pages = []
+    page = []
+    for embed in forecasts:
+        # Add the embed to the page
+        page.append(embed)
+
+        # If we've accumulated 1 embed, start a new page
+        if len(page) == 1:
+            pages.append(page)
+            page = []
+
+    # If we have any leftover embeds, add them to the last page
+    if page:
+        pages.append(page)
+
+    # Define the message components
+    class ForecastPaginator(discord.ui.View):
+        def __init__(self):
+            super().__init__()
+            self.index = 0
+            self.pages = pages
+            self.message = None
+            # Determine whether the "Next" button should be disabled initially
+            self.disabled = len(self.pages) <= 1
+
+        async def edit_message(self):
+            # Edit the message with the current page's content
+            if self.message:
+                await self.message.edit(embed=pages[self.index][0])
+
+        @discord.ui.button(label='Previous', style=discord.ButtonStyle.blurple)
+        async def prev_page(self, interaction: discord.Interaction, button: discord.ui.button):
+            # Go to the previous page, if possible
+            if self.index > 0:
+                self.index -= 1
+                self.disabled = False  # Re-enable the "Next" button
+                await self.edit_message()
+            await interaction.response.defer()
+
+        @discord.ui.button(label='Next', style=discord.ButtonStyle.blurple)
+        async def next_page(self, interaction: discord.Interaction, button: discord.ui.button):
+            # Go to the next page, if possible
+            if self.index < len(self.pages) - 1:
+                self.index += 1
+                await self.edit_message()
+            else:
+                button.disabled = True
+            await interaction.response.defer()
+
+        @discord.ui.button(label='Stop', style=discord.ButtonStyle.danger)
+        async def stop_pagination(self, interaction: discord.Interaction, button: discord.ui.button):
+            # Stop the pagination
+            await interaction.response.defer()
+            self.stop()
+
+    # Send the first page of the message with the paginator
+    view = ForecastPaginator()
+    await view.edit_message()
+    view.message = await ctx.send(embed=pages[0][0], view=view)
+
+    # Wait for the paginator to stop
+    await view.wait()
+
+
 bot.run(TOKEN)
