@@ -171,9 +171,11 @@ async def send_forecasts(ctx, forecasts):
             self.next_button = discord.ui.Button(
                 label='Next', custom_id='next', style=discord.ButtonStyle.primary)
             self.next_button.callback = self.next_page
+            self.stop_button = discord.ui.Button(
+                label='Stop', style=discord.ButtonStyle.danger)
             self.add_item(self.prev_button)
             self.add_item(self.next_button)
-            
+            self.add_item(self.stop_button)
 
         def check_buttons(self):
             self.prev_button.disabled = self.index == 0
@@ -192,7 +194,6 @@ async def send_forecasts(ctx, forecasts):
             self.check_buttons()
             await interaction.response.edit_message(view=self, embed=pages[self.index])
 
-        @ discord.ui.button(label='Stop', style=discord.ButtonStyle.danger)
         async def stop_pagination(self, interaction: discord.Interaction, button: discord.ui.button):
             # Stop the pagination
             await interaction.response.edit_message(view=None)
